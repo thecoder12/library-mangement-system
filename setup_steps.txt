@@ -1,0 +1,39 @@
+# Neighborhood Library - Setup Steps
+# ==================================
+
+# Prerequisites: Docker and Docker Compose must be installed
+
+# Step 1: Git Clone
+git clone repo
+cd library-mangement-system
+
+# Step 2: Start all services
+docker-compose up --build
+
+# Step 3: Access the application
+# Frontend:        http://localhost:3002
+# REST API:        http://localhost:8000
+# API Docs:        http://localhost:8000/docs
+# gRPC Server:     localhost:50051
+
+# ===================================
+# Optional Commands
+# ===================================
+
+# Stop all services
+docker-compose down
+
+# Stop and remove all data (including database)
+docker-compose down -v
+
+# View logs
+docker-compose logs -f
+
+# View specific service logs
+docker-compose logs -f backend
+docker-compose logs -f frontend
+docker-compose logs -f postgres
+
+# Rebuild a specific service
+docker-compose up --build backend
+docker-compose up --build frontend

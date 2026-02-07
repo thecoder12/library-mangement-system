@@ -1,0 +1,206 @@
+syntax = "proto3";
+
+package library;
+
+option go_package = "library/";
+
+// ============================================================================
+// Common Messages
+// ============================================================================
+
+message Empty {}
+
+message Timestamp {
+  int64 seconds = 1;
+  int32 nanos = 2;
+}
+
+// ============================================================================
+// Book Messages
+// ============================================================================
+
+message Book {
+  int32 id = 1;
+  string title = 2;
+  string author = 3;
+  string isbn = 4;
+  int32 published_year = 5;
+  string genre = 6;
+  int32 total_copies = 7;
+  int32 available_copies = 8;
+  string created_at = 9;
+  string updated_at = 10;
+}
+
+message CreateBookRequest {
+  string title = 1;
+  string author = 2;
+  string isbn = 3;
+  int32 published_year = 4;
+  string genre = 5;
+  int32 total_copies = 6;
+}
+
+message UpdateBookRequest {
+  int32 id = 1;
+  string title = 2;
+  string author = 3;
+  string isbn = 4;
+  int32 published_year = 5;
+  string genre = 6;
+  int32 total_copies = 7;
+}
+
+message GetBookRequest {
+  int32 id = 1;
+}
+
+message DeleteBookRequest {
+  int32 id = 1;
+}
+
+message ListBooksRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string search = 3; // Search by title or author
+}
+
+message ListBooksResponse {
+  repeated Book books = 1;
+  int32 total_count = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+// ============================================================================
+// Member Messages
+// ============================================================================
+
+message Member {
+  int32 id = 1;
+  string name = 2;
+  string email = 3;
+  string phone = 4;
+  string address = 5;
+  string membership_date = 6;
+  bool is_active = 7;
+  string created_at = 8;
+  string updated_at = 9;
+}
+
+message CreateMemberRequest {
+  string name = 1;
+  string email = 2;
+  string phone = 3;
+  string address = 4;
+}
+
+message UpdateMemberRequest {
+  int32 id = 1;
+  string name = 2;
+  string email = 3;
+  string phone = 4;
+  string address = 5;
+  bool is_active = 6;
+}
+
+message GetMemberRequest {
+  int32 id = 1;
+}
+
+message DeleteMemberRequest {
+  int32 id = 1;
+}
+
+message ListMembersRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string search = 3; // Search by name or email
+}
+
+message ListMembersResponse {
+  repeated Member members = 1;
+  int32 total_count = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+// ============================================================================
+// Borrowing Messages
+// ============================================================================
+
+message BorrowRecord {
+  int32 id = 1;
+  int32 book_id = 2;
+  int32 member_id = 3;
+  string borrow_date = 4;
+  string due_date = 5;
+  string return_date = 6; // Empty if not returned
+  string status = 7; // BORROWED, RETURNED
+  Book book = 8;
+  Member member = 9;
+}
+
+message BorrowBookRequest {
+  int32 book_id = 1;
+  int32 member_id = 2;
+}
+
+message ReturnBookRequest {
+  int32 borrow_id = 1;
+}
+
+message GetBorrowRecordRequest {
+  int32 id = 1;
+}
+
+message ListBorrowRecordsRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  int32 member_id = 3; // Filter by member (optional)
+  int32 book_id = 4; // Filter by book (optional)
+  string status = 5; // Filter by status: BORROWED, RETURNED, or empty for all
+}
+
+message ListBorrowRecordsResponse {
+  repeated BorrowRecord records = 1;
+  int32 total_count = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message GetMemberBorrowedBooksRequest {
+  int32 member_id = 1;
+}
+
+message GetMemberBorrowedBooksResponse {
+  repeated BorrowRecord records = 1;
+  Member member = 2;
+}
+
+// ============================================================================
+// Library Service Definition
+// ============================================================================
+
+service LibraryService {
+  // Book operations
+  rpc CreateBook(CreateBookRequest) returns (Book);
+  rpc GetBook(GetBookRequest) returns (Book);
+  rpc UpdateBook(UpdateBookRequest) returns (Book);
+  rpc DeleteBook(DeleteBookRequest) returns (Empty);
+  rpc ListBooks(ListBooksRequest) returns (ListBooksResponse);
+
+  // Member operations
+  rpc CreateMember(CreateMemberRequest) returns (Member);
+  rpc GetMember(GetMemberRequest) returns (Member);
+  rpc UpdateMember(UpdateMemberRequest) returns (Member);
+  rpc DeleteMember(DeleteMemberRequest) returns (Empty);
+  rpc ListMembers(ListMembersRequest) returns (ListMembersResponse);
+
+  // Borrowing operations
+  rpc BorrowBook(BorrowBookRequest) returns (BorrowRecord);
+  rpc ReturnBook(ReturnBookRequest) returns (BorrowRecord);
+  rpc GetBorrowRecord(GetBorrowRecordRequest) returns (BorrowRecord);
+  rpc ListBorrowRecords(ListBorrowRecordsRequest) returns (ListBorrowRecordsResponse);
+  rpc GetMemberBorrowedBooks(GetMemberBorrowedBooksRequest) returns (GetMemberBorrowedBooksResponse);
+}

@@ -1,0 +1,22 @@
+# gRPC dependencies
+grpcio==1.60.0
+grpcio-tools==1.60.0
+grpcio-reflection==1.60.0
+
+# REST API (for frontend compatibility)
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+
+# Database
+psycopg2-binary==2.9.9
+sqlalchemy==2.0.25
+
+# Environment and utilities
+python-dotenv==1.0.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+pydantic[email]
+
+# Development
+pytest==7.4.4
+pytest-asyncio==0.23.3
