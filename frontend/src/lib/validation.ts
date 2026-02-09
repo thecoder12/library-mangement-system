@@ -142,11 +142,14 @@ export function validateISBN(isbn: string): ValidationResult {
 /**
  * Trims all string fields in a form data object
  */
-export function trimFormData<T extends Record<string, unknown>>(data: T): T {
-  const trimmed = { ...data }
+export function trimFormData<T extends object>(data: T): T {
+  const trimmed = { ...data } as T
   for (const key in trimmed) {
-    if (typeof trimmed[key] === 'string') {
-      (trimmed as Record<string, unknown>)[key] = (trimmed[key] as string).trim()
+    if (Object.prototype.hasOwnProperty.call(trimmed, key)) {
+      const value = trimmed[key as keyof T]
+      if (typeof value === 'string') {
+        (trimmed as Record<string, unknown>)[key] = value.trim()
+      }
     }
   }
   return trimmed

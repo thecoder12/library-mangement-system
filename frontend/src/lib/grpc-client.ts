@@ -17,8 +17,8 @@ import {
   ReturnBookRequest,
 } from './types'
 
-// Import centralized API endpoints from shared constants
-import { BOOKS_ENDPOINTS, MEMBERS_ENDPOINTS, BORROWS_ENDPOINTS } from '@shared/constants'
+// Import centralized API endpoints
+import { BOOKS_ENDPOINTS, MEMBERS_ENDPOINTS, BORROWS_ENDPOINTS } from './api-endpoints'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
