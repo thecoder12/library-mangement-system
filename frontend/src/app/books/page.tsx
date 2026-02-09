@@ -7,6 +7,9 @@ import { Book, CreateBookRequest, UpdateBookRequest } from '@/lib/types'
 import { Table } from '@/components/Table'
 import { Pagination } from '@/components/Pagination'
 import { Modal } from '@/components/Modal'
+import { useToast } from '@/components/Toast'
+import { useConfirm } from '@/components/ConfirmDialog'
+import { validateField, validateISBN, trimFormData, isEmptyOrWhitespace } from '@/lib/validation'
 
 export default function BooksPage() {
   const [books, setBooks] = useState<Book[]>([])
@@ -31,6 +34,10 @@ export default function BooksPage() {
   })
   const [formError, setFormError] = useState<string | null>(null)
   const [formLoading, setFormLoading] = useState(false)
+
+  // UI feedback hooks
+  const { showError, showSuccess } = useToast()
+  const confirm = useConfirm()
 
   useEffect(() => {
     loadBooks()
@@ -85,20 +92,67 @@ export default function BooksPage() {
     setIsModalOpen(true)
   }
 
+  const validateForm = (): boolean => {
+    // Validate required fields with trimming
+    const titleValidation = validateField({
+      value: formData.title,
+      fieldName: 'Title',
+      required: true,
+      minLength: 1,
+    })
+    if (!titleValidation.isValid) {
+      setFormError(titleValidation.error || 'Invalid title')
+      return false
+    }
+
+    const authorValidation = validateField({
+      value: formData.author,
+      fieldName: 'Author',
+      required: true,
+      minLength: 1,
+    })
+    if (!authorValidation.isValid) {
+      setFormError(authorValidation.error || 'Invalid author')
+      return false
+    }
+
+    // Validate ISBN format if provided
+    if (formData.isbn && !isEmptyOrWhitespace(formData.isbn)) {
+      const isbnValidation = validateISBN(formData.isbn)
+      if (!isbnValidation.isValid) {
+        setFormError(isbnValidation.error || 'Invalid ISBN')
+        return false
+      }
+    }
+
+    return true
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setFormLoading(true)
     setFormError(null)
 
+    // Validate form with custom validation
+    if (!validateForm()) {
+      return
+    }
+
+    setFormLoading(true)
+
     try {
+      // Trim all string fields before submission
+      const trimmedData = trimFormData(formData)
+      
       if (editingBook) {
         const updateData: UpdateBookRequest = {
           id: editingBook.id,
-          ...formData,
+          ...trimmedData,
         }
         await libraryClient.updateBook(updateData)
+        showSuccess('Book updated successfully')
       } else {
-        await libraryClient.createBook(formData)
+        await libraryClient.createBook(trimmedData)
+        showSuccess('Book created successfully')
       }
       setIsModalOpen(false)
       loadBooks()
@@ -110,13 +164,22 @@ export default function BooksPage() {
   }
 
   const handleDelete = async (book: Book) => {
-    if (!confirm(`Are you sure you want to delete "${book.title}"?`)) return
+    const confirmed = await confirm({
+      title: 'Delete Book',
+      message: `Are you sure you want to delete "${book.title}"? This action cannot be undone.`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    })
+
+    if (!confirmed) return
 
     try {
       await libraryClient.deleteBook(book.id)
+      showSuccess(`"${book.title}" has been deleted`)
       loadBooks()
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to delete book')
+      showError(err instanceof Error ? err.message : 'Failed to delete book')
     }
   }
 
@@ -217,10 +280,10 @@ export default function BooksPage() {
             <label className="label">Title *</label>
             <input
               type="text"
-              required
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              className="input"
+              className={`input ${formError && isEmptyOrWhitespace(formData.title) ? 'input-error' : ''}`}
+              placeholder="Enter book title"
             />
           </div>
           
@@ -228,10 +291,10 @@ export default function BooksPage() {
             <label className="label">Author *</label>
             <input
               type="text"
-              required
               value={formData.author}
               onChange={(e) => setFormData({ ...formData, author: e.target.value })}
-              className="input"
+              className={`input ${formError && isEmptyOrWhitespace(formData.author) ? 'input-error' : ''}`}
+              placeholder="Enter author name"
             />
           </div>
           
@@ -243,7 +306,9 @@ export default function BooksPage() {
                 value={formData.isbn || ''}
                 onChange={(e) => setFormData({ ...formData, isbn: e.target.value })}
                 className="input"
+                placeholder="e.g., 978-0-123456-78-9"
               />
+              <p className="mt-1 text-xs text-gray-500">Optional - 10 or 13 digits</p>
             </div>
             <div>
               <label className="label">Published Year</label>
@@ -252,6 +317,7 @@ export default function BooksPage() {
                 value={formData.publishedYear || ''}
                 onChange={(e) => setFormData({ ...formData, publishedYear: e.target.value ? parseInt(e.target.value) : undefined })}
                 className="input"
+                placeholder="e.g., 2024"
               />
             </div>
           </div>
@@ -264,6 +330,7 @@ export default function BooksPage() {
                 value={formData.genre || ''}
                 onChange={(e) => setFormData({ ...formData, genre: e.target.value })}
                 className="input"
+                placeholder="e.g., Fiction"
               />
             </div>
             <div>

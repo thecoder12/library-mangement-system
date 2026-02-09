@@ -7,6 +7,8 @@ import { Book, Member, BorrowRecord } from '@/lib/types'
 import { Table } from '@/components/Table'
 import { Pagination } from '@/components/Pagination'
 import { Modal } from '@/components/Modal'
+import { useToast } from '@/components/Toast'
+import { useConfirm } from '@/components/ConfirmDialog'
 
 export default function BorrowPage() {
   const [records, setRecords] = useState<BorrowRecord[]>([])
@@ -25,6 +27,10 @@ export default function BorrowPage() {
   const [selectedMemberId, setSelectedMemberId] = useState<number | ''>('')
   const [borrowLoading, setBorrowLoading] = useState(false)
   const [borrowError, setBorrowError] = useState<string | null>(null)
+
+  // UI feedback hooks
+  const { showError, showSuccess } = useToast()
+  const confirm = useConfirm()
 
   useEffect(() => {
     loadRecords()
@@ -70,12 +76,28 @@ export default function BorrowPage() {
     loadBooksAndMembers()
   }
 
+  const validateBorrowForm = (): boolean => {
+    if (!selectedMemberId) {
+      setBorrowError('Please select a member')
+      return false
+    }
+    if (!selectedBookId) {
+      setBorrowError('Please select a book')
+      return false
+    }
+    return true
+  }
+
   const handleBorrow = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedBookId || !selectedMemberId) return
+    setBorrowError(null)
+
+    // Validate form
+    if (!validateBorrowForm()) {
+      return
+    }
 
     setBorrowLoading(true)
-    setBorrowError(null)
 
     try {
       await libraryClient.borrowBook({
@@ -83,6 +105,7 @@ export default function BorrowPage() {
         memberId: selectedMemberId as number,
       })
       setIsBorrowModalOpen(false)
+      showSuccess('Book borrowed successfully')
       loadRecords()
     } catch (err) {
       setBorrowError(err instanceof Error ? err.message : 'Failed to borrow book')
@@ -92,13 +115,25 @@ export default function BorrowPage() {
   }
 
   const handleReturn = async (record: BorrowRecord) => {
-    if (!confirm('Are you sure you want to return this book?')) return
+    const bookTitle = record.book?.title || `Book #${record.bookId}`
+    const memberName = record.member?.name || `Member #${record.memberId}`
+    
+    const confirmed = await confirm({
+      title: 'Return Book',
+      message: `Are you sure you want to return "${bookTitle}" from ${memberName}?`,
+      confirmText: 'Return Book',
+      cancelText: 'Cancel',
+      variant: 'info',
+    })
+
+    if (!confirmed) return
 
     try {
       await libraryClient.returnBook({ borrowId: record.id })
+      showSuccess(`"${bookTitle}" has been returned successfully`)
       loadRecords()
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to return book')
+      showError(err instanceof Error ? err.message : 'Failed to return book')
     }
   }
 
@@ -226,10 +261,9 @@ export default function BorrowPage() {
           <div>
             <label className="label">Select Member *</label>
             <select
-              required
               value={selectedMemberId}
               onChange={(e) => setSelectedMemberId(e.target.value ? parseInt(e.target.value) : '')}
-              className="input"
+              className={`input ${borrowError && !selectedMemberId ? 'input-error' : ''}`}
             >
               <option value="">Choose a member...</option>
               {members.map((member) => (
@@ -246,10 +280,9 @@ export default function BorrowPage() {
           <div>
             <label className="label">Select Book *</label>
             <select
-              required
               value={selectedBookId}
               onChange={(e) => setSelectedBookId(e.target.value ? parseInt(e.target.value) : '')}
-              className="input"
+              className={`input ${borrowError && !selectedBookId ? 'input-error' : ''}`}
             >
               <option value="">Choose a book...</option>
               {books.map((book) => (

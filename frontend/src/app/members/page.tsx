@@ -7,6 +7,9 @@ import { Member, CreateMemberRequest, UpdateMemberRequest } from '@/lib/types'
 import { Table } from '@/components/Table'
 import { Pagination } from '@/components/Pagination'
 import { Modal } from '@/components/Modal'
+import { useToast } from '@/components/Toast'
+import { useConfirm } from '@/components/ConfirmDialog'
+import { validateField, validateEmail, trimFormData, isEmptyOrWhitespace } from '@/lib/validation'
 
 export default function MembersPage() {
   const [members, setMembers] = useState<Member[]>([])
@@ -29,6 +32,10 @@ export default function MembersPage() {
   })
   const [formError, setFormError] = useState<string | null>(null)
   const [formLoading, setFormLoading] = useState(false)
+
+  // UI feedback hooks
+  const { showError, showSuccess } = useToast()
+  const confirm = useConfirm()
 
   useEffect(() => {
     loadMembers()
@@ -80,24 +87,58 @@ export default function MembersPage() {
     setIsModalOpen(true)
   }
 
+  const validateForm = (): boolean => {
+    // Validate name with trimming
+    const nameValidation = validateField({
+      value: formData.name,
+      fieldName: 'Name',
+      required: true,
+      minLength: 1,
+    })
+    if (!nameValidation.isValid) {
+      setFormError(nameValidation.error || 'Invalid name')
+      return false
+    }
+
+    // Validate email format with trimming
+    const emailValidation = validateEmail(formData.email)
+    if (!emailValidation.isValid) {
+      setFormError(emailValidation.error || 'Invalid email')
+      return false
+    }
+
+    return true
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setFormLoading(true)
     setFormError(null)
 
+    // Validate form with custom validation
+    if (!validateForm()) {
+      return
+    }
+
+    setFormLoading(true)
+
     try {
+      // Trim all string fields before submission
+      const trimmedData = trimFormData(formData)
+      
       if (editingMember) {
         const updateData: UpdateMemberRequest = {
           id: editingMember.id,
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          address: formData.address,
-          isActive: formData.isActive,
+          name: trimmedData.name,
+          email: trimmedData.email,
+          phone: trimmedData.phone,
+          address: trimmedData.address,
+          isActive: trimmedData.isActive,
         }
         await libraryClient.updateMember(updateData)
+        showSuccess('Member updated successfully')
       } else {
-        await libraryClient.createMember(formData)
+        await libraryClient.createMember(trimmedData)
+        showSuccess('Member created successfully')
       }
       setIsModalOpen(false)
       loadMembers()
@@ -109,13 +150,22 @@ export default function MembersPage() {
   }
 
   const handleDelete = async (member: Member) => {
-    if (!confirm(`Are you sure you want to delete "${member.name}"?`)) return
+    const confirmed = await confirm({
+      title: 'Delete Member',
+      message: `Are you sure you want to delete "${member.name}"? This action cannot be undone.`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    })
+
+    if (!confirmed) return
 
     try {
       await libraryClient.deleteMember(member.id)
+      showSuccess(`"${member.name}" has been deleted`)
       loadMembers()
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to delete member')
+      showError(err instanceof Error ? err.message : 'Failed to delete member')
     }
   }
 
@@ -221,10 +271,10 @@ export default function MembersPage() {
             <label className="label">Name *</label>
             <input
               type="text"
-              required
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="input"
+              className={`input ${formError && isEmptyOrWhitespace(formData.name) ? 'input-error' : ''}`}
+              placeholder="Enter member name"
             />
           </div>
           
@@ -232,10 +282,10 @@ export default function MembersPage() {
             <label className="label">Email *</label>
             <input
               type="email"
-              required
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="input"
+              className={`input ${formError && isEmptyOrWhitespace(formData.email) ? 'input-error' : ''}`}
+              placeholder="Enter email address"
             />
           </div>
           
@@ -246,6 +296,7 @@ export default function MembersPage() {
               value={formData.phone || ''}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               className="input"
+              placeholder="Enter phone number"
             />
           </div>
           
@@ -256,6 +307,7 @@ export default function MembersPage() {
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
               className="input"
               rows={2}
+              placeholder="Enter address"
             />
           </div>
           
