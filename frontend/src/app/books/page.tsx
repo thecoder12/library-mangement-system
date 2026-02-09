@@ -125,6 +125,7 @@ export default function BooksPage() {
       }
     }
 
+<<<<<<< HEAD
     // Validate Published Year if provided
     if (formData.publishedYear !== undefined && formData.publishedYear !== null) {
       const currentYear = new Date().getFullYear()
@@ -149,6 +150,8 @@ export default function BooksPage() {
       return false
     }
 
+=======
+>>>>>>> 0d1e90b (feat(frontend): Implement FE feedback improvements)
     return true
   }
 

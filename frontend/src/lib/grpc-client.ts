@@ -17,8 +17,13 @@ import {
   ReturnBookRequest,
 } from './types'
 
+<<<<<<< HEAD
 // Import centralized API endpoints
 import { BOOKS_ENDPOINTS, MEMBERS_ENDPOINTS, BORROWS_ENDPOINTS } from './api-endpoints'
+=======
+// Import centralized API endpoints from shared constants
+import { BOOKS_ENDPOINTS, MEMBERS_ENDPOINTS, BORROWS_ENDPOINTS } from '@shared/constants'
+>>>>>>> 0d1e90b (feat(frontend): Implement FE feedback improvements)
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
