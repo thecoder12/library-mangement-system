@@ -49,7 +49,8 @@ services:
       dockerfile: Dockerfile
     container_name: library_frontend
     environment:
-      NEXT_PUBLIC_API_URL: http://backend:8000
+      # NEXT_PUBLIC_API_URL must be browser-accessible (not Docker internal hostname)
+      NEXT_PUBLIC_API_URL: http://localhost:8000
     ports:
       - "3002:3000"
     depends_on:

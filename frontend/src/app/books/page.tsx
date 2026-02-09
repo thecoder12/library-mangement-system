@@ -125,6 +125,30 @@ export default function BooksPage() {
       }
     }
 
+    // Validate Published Year if provided
+    if (formData.publishedYear !== undefined && formData.publishedYear !== null) {
+      const currentYear = new Date().getFullYear()
+      if (formData.publishedYear < 1000) {
+        setFormError('Published Year must be 1000 or later')
+        return false
+      }
+      if (formData.publishedYear > currentYear) {
+        setFormError(`Published Year cannot be in the future (max: ${currentYear})`)
+        return false
+      }
+    }
+
+    // Validate Total Copies - must be between 1 and 10000
+    const totalCopies = formData.totalCopies || 1
+    if (totalCopies < 1) {
+      setFormError('Total Copies must be at least 1')
+      return false
+    }
+    if (totalCopies > 10000) {
+      setFormError('Total Copies cannot exceed 10,000')
+      return false
+    }
+
     return true
   }
 
@@ -157,7 +181,16 @@ export default function BooksPage() {
       setIsModalOpen(false)
       loadBooks()
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'An error occurred')
+      // Handle different error types
+      if (err instanceof Error) {
+        setFormError(err.message)
+      } else if (typeof err === 'object' && err !== null) {
+        // Handle object errors from API
+        const errorObj = err as Record<string, unknown>
+        setFormError(errorObj.message as string || errorObj.detail as string || 'An error occurred')
+      } else {
+        setFormError('An error occurred')
+      }
     } finally {
       setFormLoading(false)
     }
@@ -314,11 +347,14 @@ export default function BooksPage() {
               <label className="label">Published Year</label>
               <input
                 type="number"
+                min="1000"
+                max={new Date().getFullYear()}
                 value={formData.publishedYear || ''}
                 onChange={(e) => setFormData({ ...formData, publishedYear: e.target.value ? parseInt(e.target.value) : undefined })}
                 className="input"
                 placeholder="e.g., 2024"
               />
+              <p className="mt-1 text-xs text-gray-500">1000 - {new Date().getFullYear()}</p>
             </div>
           </div>
           
@@ -338,10 +374,12 @@ export default function BooksPage() {
               <input
                 type="number"
                 min="1"
+                max="10000"
                 value={formData.totalCopies || 1}
                 onChange={(e) => setFormData({ ...formData, totalCopies: parseInt(e.target.value) || 1 })}
                 className="input"
               />
+              <p className="mt-1 text-xs text-gray-500">Max 10,000 copies</p>
             </div>
           </div>
           
