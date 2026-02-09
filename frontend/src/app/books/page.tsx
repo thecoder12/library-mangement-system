@@ -7,8 +7,22 @@ import { Book, CreateBookRequest, UpdateBookRequest } from '@/lib/types'
 import { Table } from '@/components/Table'
 import { Pagination } from '@/components/Pagination'
 import { Modal } from '@/components/Modal'
+import { useToast } from '@/components/Toast'
+import { useConfirm } from '@/components/ConfirmDialog'
+import { FormField, Input } from '@/components/FormField'
+import { 
+  ValidationErrors, 
+  validateRequired, 
+  validateRange, 
+  validateYear, 
+  validateISBN,
+  hasErrors,
+  trimFormData 
+} from '@/lib/validation'
 
 export default function BooksPage() {
+  const toast = useToast()
+  const { confirm } = useConfirm()
   const [books, setBooks] = useState<Book[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -31,6 +45,7 @@ export default function BooksPage() {
   })
   const [formError, setFormError] = useState<string | null>(null)
   const [formLoading, setFormLoading] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<ValidationErrors>({})
 
   useEffect(() => {
     loadBooks()
@@ -68,6 +83,7 @@ export default function BooksPage() {
       totalCopies: 1,
     })
     setFormError(null)
+    setFieldErrors({})
     setIsModalOpen(true)
   }
 
@@ -82,23 +98,48 @@ export default function BooksPage() {
       totalCopies: book.totalCopies,
     })
     setFormError(null)
+    setFieldErrors({})
     setIsModalOpen(true)
+  }
+
+  const validateForm = (): boolean => {
+    const errors: ValidationErrors = {
+      title: validateRequired(formData.title, 'Title'),
+      author: validateRequired(formData.author, 'Author'),
+      isbn: validateISBN(formData.isbn),
+      publishedYear: validateYear(formData.publishedYear, 'Published Year'),
+      totalCopies: validateRange(formData.totalCopies, 1, 10000, 'Total Copies'),
+    }
+    
+    setFieldErrors(errors)
+    return !hasErrors(errors)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setFormLoading(true)
     setFormError(null)
+
+    // Trim and validate
+    const trimmedData = trimFormData(formData)
+    setFormData(trimmedData)
+    
+    if (!validateForm()) {
+      return
+    }
+
+    setFormLoading(true)
 
     try {
       if (editingBook) {
         const updateData: UpdateBookRequest = {
           id: editingBook.id,
-          ...formData,
+          ...trimmedData,
         }
         await libraryClient.updateBook(updateData)
+        toast.success(`Book "${trimmedData.title}" updated successfully`)
       } else {
-        await libraryClient.createBook(formData)
+        await libraryClient.createBook(trimmedData)
+        toast.success(`Book "${trimmedData.title}" created successfully`)
       }
       setIsModalOpen(false)
       loadBooks()
@@ -110,13 +151,22 @@ export default function BooksPage() {
   }
 
   const handleDelete = async (book: Book) => {
-    if (!confirm(`Are you sure you want to delete "${book.title}"?`)) return
+    const confirmed = await confirm({
+      title: 'Delete Book',
+      message: `Are you sure you want to delete "${book.title}"? This action cannot be undone.`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    })
+    
+    if (!confirmed) return
 
     try {
       await libraryClient.deleteBook(book.id)
+      toast.success(`Book "${book.title}" deleted successfully`)
       loadBooks()
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to delete book')
+      toast.error(err instanceof Error ? err.message : 'Failed to delete book')
     }
   }
 
@@ -213,69 +263,81 @@ export default function BooksPage() {
             </div>
           )}
           
-          <div>
-            <label className="label">Title *</label>
-            <input
+          <FormField label="Title" required error={fieldErrors.title}>
+            <Input
               type="text"
-              required
               value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              className="input"
+              onChange={(e) => {
+                setFormData({ ...formData, title: e.target.value })
+                if (fieldErrors.title) setFieldErrors({ ...fieldErrors, title: null })
+              }}
+              error={fieldErrors.title}
+              placeholder="Enter book title"
             />
-          </div>
+          </FormField>
           
-          <div>
-            <label className="label">Author *</label>
-            <input
+          <FormField label="Author" required error={fieldErrors.author}>
+            <Input
               type="text"
-              required
               value={formData.author}
-              onChange={(e) => setFormData({ ...formData, author: e.target.value })}
-              className="input"
+              onChange={(e) => {
+                setFormData({ ...formData, author: e.target.value })
+                if (fieldErrors.author) setFieldErrors({ ...fieldErrors, author: null })
+              }}
+              error={fieldErrors.author}
+              placeholder="Enter author name"
             />
-          </div>
+          </FormField>
           
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="label">ISBN</label>
-              <input
+            <FormField label="ISBN" error={fieldErrors.isbn}>
+              <Input
                 type="text"
                 value={formData.isbn || ''}
-                onChange={(e) => setFormData({ ...formData, isbn: e.target.value })}
-                className="input"
+                onChange={(e) => {
+                  setFormData({ ...formData, isbn: e.target.value })
+                  if (fieldErrors.isbn) setFieldErrors({ ...fieldErrors, isbn: null })
+                }}
+                error={fieldErrors.isbn}
+                placeholder="e.g., 978-0-123456-78-9"
               />
-            </div>
-            <div>
-              <label className="label">Published Year</label>
-              <input
+            </FormField>
+            <FormField label="Published Year" error={fieldErrors.publishedYear}>
+              <Input
                 type="number"
                 value={formData.publishedYear || ''}
-                onChange={(e) => setFormData({ ...formData, publishedYear: e.target.value ? parseInt(e.target.value) : undefined })}
-                className="input"
+                onChange={(e) => {
+                  setFormData({ ...formData, publishedYear: e.target.value ? parseInt(e.target.value) : undefined })
+                  if (fieldErrors.publishedYear) setFieldErrors({ ...fieldErrors, publishedYear: null })
+                }}
+                error={fieldErrors.publishedYear}
+                placeholder="e.g., 2024"
               />
-            </div>
+            </FormField>
           </div>
           
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="label">Genre</label>
-              <input
+            <FormField label="Genre">
+              <Input
                 type="text"
                 value={formData.genre || ''}
                 onChange={(e) => setFormData({ ...formData, genre: e.target.value })}
-                className="input"
+                placeholder="e.g., Fiction, Non-fiction"
               />
-            </div>
-            <div>
-              <label className="label">Total Copies</label>
-              <input
+            </FormField>
+            <FormField label="Total Copies" error={fieldErrors.totalCopies}>
+              <Input
                 type="number"
                 min="1"
+                max="10000"
                 value={formData.totalCopies || 1}
-                onChange={(e) => setFormData({ ...formData, totalCopies: parseInt(e.target.value) || 1 })}
-                className="input"
+                onChange={(e) => {
+                  setFormData({ ...formData, totalCopies: parseInt(e.target.value) || 1 })
+                  if (fieldErrors.totalCopies) setFieldErrors({ ...fieldErrors, totalCopies: null })
+                }}
+                error={fieldErrors.totalCopies}
               />
-            </div>
+            </FormField>
           </div>
           
           <div className="flex justify-end space-x-3 pt-4">

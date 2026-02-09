@@ -98,6 +98,7 @@ export interface ListBorrowRecordsRequest {
   memberId?: number
   bookId?: number
   status?: string
+  search?: string
 }
 
 export interface ListBorrowRecordsResponse {

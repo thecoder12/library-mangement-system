@@ -18,6 +18,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ ./app/
 COPY server.py rest_server.py ./
 
+# Create logs directory
+RUN mkdir -p logs
+
 # Copy proto files and generate code
 COPY protos/ ./protos/
 COPY generate_proto.sh .

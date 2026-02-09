@@ -16,6 +16,7 @@ import {
   BorrowBookRequest,
   ReturnBookRequest,
 } from './types'
+import { ENDPOINTS } from './api-endpoints'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -51,25 +52,25 @@ class LibraryClient {
 
   // Book operations
   async createBook(request: CreateBookRequest): Promise<Book> {
-    return this.request<Book>('/api/books', {
+    return this.request<Book>(ENDPOINTS.BOOKS.BASE, {
       method: 'POST',
       body: JSON.stringify(request),
     })
   }
 
   async getBook(id: number): Promise<Book> {
-    return this.request<Book>(`/api/books/${id}`)
+    return this.request<Book>(ENDPOINTS.BOOKS.BY_ID(id))
   }
 
   async updateBook(request: UpdateBookRequest): Promise<Book> {
-    return this.request<Book>(`/api/books/${request.id}`, {
+    return this.request<Book>(ENDPOINTS.BOOKS.BY_ID(request.id), {
       method: 'PUT',
       body: JSON.stringify(request),
     })
   }
 
   async deleteBook(id: number): Promise<void> {
-    await this.request(`/api/books/${id}`, { method: 'DELETE' })
+    await this.request(ENDPOINTS.BOOKS.BY_ID(id), { method: 'DELETE' })
   }
 
   async listBooks(params: ListRequest = {}): Promise<ListBooksResponse> {
@@ -79,30 +80,30 @@ class LibraryClient {
     if (params.search) searchParams.set('search', params.search)
     
     const query = searchParams.toString()
-    return this.request<ListBooksResponse>(`/api/books${query ? `?${query}` : ''}`)
+    return this.request<ListBooksResponse>(`${ENDPOINTS.BOOKS.BASE}${query ? `?${query}` : ''}`)
   }
 
   // Member operations
   async createMember(request: CreateMemberRequest): Promise<Member> {
-    return this.request<Member>('/api/members', {
+    return this.request<Member>(ENDPOINTS.MEMBERS.BASE, {
       method: 'POST',
       body: JSON.stringify(request),
     })
   }
 
   async getMember(id: number): Promise<Member> {
-    return this.request<Member>(`/api/members/${id}`)
+    return this.request<Member>(ENDPOINTS.MEMBERS.BY_ID(id))
   }
 
   async updateMember(request: UpdateMemberRequest): Promise<Member> {
-    return this.request<Member>(`/api/members/${request.id}`, {
+    return this.request<Member>(ENDPOINTS.MEMBERS.BY_ID(request.id), {
       method: 'PUT',
       body: JSON.stringify(request),
     })
   }
 
-  async deleteMember(id: number): Promise<void> {
-    await this.request(`/api/members/${id}`, { method: 'DELETE' })
+  async deleteMember(id: number): Promise<{ message: string; deleted?: boolean; deactivated?: boolean }> {
+    return this.request(ENDPOINTS.MEMBERS.BY_ID(id), { method: 'DELETE' })
   }
 
   async listMembers(params: ListRequest = {}): Promise<ListMembersResponse> {
@@ -112,25 +113,25 @@ class LibraryClient {
     if (params.search) searchParams.set('search', params.search)
     
     const query = searchParams.toString()
-    return this.request<ListMembersResponse>(`/api/members${query ? `?${query}` : ''}`)
+    return this.request<ListMembersResponse>(`${ENDPOINTS.MEMBERS.BASE}${query ? `?${query}` : ''}`)
   }
 
   // Borrow operations
   async borrowBook(request: BorrowBookRequest): Promise<BorrowRecord> {
-    return this.request<BorrowRecord>('/api/borrows', {
+    return this.request<BorrowRecord>(ENDPOINTS.BORROWS.BASE, {
       method: 'POST',
       body: JSON.stringify(request),
     })
   }
 
   async returnBook(request: ReturnBookRequest): Promise<BorrowRecord> {
-    return this.request<BorrowRecord>(`/api/borrows/${request.borrowId}/return`, {
+    return this.request<BorrowRecord>(ENDPOINTS.BORROWS.RETURN(request.borrowId), {
       method: 'POST',
     })
   }
 
   async getBorrowRecord(id: number): Promise<BorrowRecord> {
-    return this.request<BorrowRecord>(`/api/borrows/${id}`)
+    return this.request<BorrowRecord>(ENDPOINTS.BORROWS.BY_ID(id))
   }
 
   async listBorrowRecords(params: ListBorrowRecordsRequest = {}): Promise<ListBorrowRecordsResponse> {
@@ -140,13 +141,14 @@ class LibraryClient {
     if (params.memberId) searchParams.set('member_id', params.memberId.toString())
     if (params.bookId) searchParams.set('book_id', params.bookId.toString())
     if (params.status) searchParams.set('status', params.status)
+    if (params.search) searchParams.set('search', params.search)
     
     const query = searchParams.toString()
-    return this.request<ListBorrowRecordsResponse>(`/api/borrows${query ? `?${query}` : ''}`)
+    return this.request<ListBorrowRecordsResponse>(`${ENDPOINTS.BORROWS.BASE}${query ? `?${query}` : ''}`)
   }
 
   async getMemberBorrowedBooks(memberId: number): Promise<{ records: BorrowRecord[], member: Member }> {
-    return this.request(`/api/members/${memberId}/borrowed`)
+    return this.request(ENDPOINTS.MEMBERS.BORROWED(memberId))
   }
 }
 

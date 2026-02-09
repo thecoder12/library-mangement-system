@@ -1,6 +1,5 @@
 """gRPC Server for the Neighborhood Library Service."""
 
-import logging
 from concurrent import futures
 import grpc
 from grpc_reflection.v1alpha import reflection
@@ -8,13 +7,11 @@ from grpc_reflection.v1alpha import reflection
 from app.config import get_settings
 from app.generated import library_pb2, library_pb2_grpc
 from app.services.library_service import LibraryServiceServicer
+from app.logging_config import setup_logging, get_logger
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+# Configure structured logging
+setup_logging()
+logger = get_logger(__name__)
 
 
 def serve():
@@ -48,8 +45,15 @@ def serve():
     
     # Start server
     server.start()
-    logger.info(f"🚀 gRPC server started on {address}")
-    logger.info(f"📚 Neighborhood Library Service is ready to accept requests")
+    logger.info(
+        "gRPC server started",
+        extra={
+            "address": address,
+            "log_level": settings.log_level,
+            "log_file": settings.log_file,
+        }
+    )
+    logger.info("Neighborhood Library Service is ready to accept requests")
     
     try:
         server.wait_for_termination()

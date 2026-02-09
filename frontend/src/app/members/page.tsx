@@ -7,8 +7,21 @@ import { Member, CreateMemberRequest, UpdateMemberRequest } from '@/lib/types'
 import { Table } from '@/components/Table'
 import { Pagination } from '@/components/Pagination'
 import { Modal } from '@/components/Modal'
+import { useToast } from '@/components/Toast'
+import { useConfirm } from '@/components/ConfirmDialog'
+import { FormField, Input, Textarea } from '@/components/FormField'
+import { 
+  ValidationErrors, 
+  validateRequired, 
+  validateEmail,
+  validatePhone,
+  hasErrors,
+  trimFormData 
+} from '@/lib/validation'
 
 export default function MembersPage() {
+  const toast = useToast()
+  const { confirm } = useConfirm()
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -29,6 +42,7 @@ export default function MembersPage() {
   })
   const [formError, setFormError] = useState<string | null>(null)
   const [formLoading, setFormLoading] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<ValidationErrors>({})
 
   useEffect(() => {
     loadMembers()
@@ -64,6 +78,7 @@ export default function MembersPage() {
       address: '',
     })
     setFormError(null)
+    setFieldErrors({})
     setIsModalOpen(true)
   }
 
@@ -77,27 +92,50 @@ export default function MembersPage() {
       isActive: member.isActive,
     })
     setFormError(null)
+    setFieldErrors({})
     setIsModalOpen(true)
+  }
+
+  const validateForm = (): boolean => {
+    const errors: ValidationErrors = {
+      name: validateRequired(formData.name, 'Name'),
+      email: validateEmail(formData.email),
+      phone: validatePhone(formData.phone),
+    }
+    
+    setFieldErrors(errors)
+    return !hasErrors(errors)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setFormLoading(true)
     setFormError(null)
+
+    // Trim and validate
+    const trimmedData = trimFormData(formData)
+    setFormData(trimmedData)
+    
+    if (!validateForm()) {
+      return
+    }
+
+    setFormLoading(true)
 
     try {
       if (editingMember) {
         const updateData: UpdateMemberRequest = {
           id: editingMember.id,
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          address: formData.address,
-          isActive: formData.isActive,
+          name: trimmedData.name,
+          email: trimmedData.email,
+          phone: trimmedData.phone,
+          address: trimmedData.address,
+          isActive: trimmedData.isActive,
         }
         await libraryClient.updateMember(updateData)
+        toast.success(`Member "${trimmedData.name}" updated successfully`)
       } else {
-        await libraryClient.createMember(formData)
+        await libraryClient.createMember(trimmedData)
+        toast.success(`Member "${trimmedData.name}" created successfully`)
       }
       setIsModalOpen(false)
       loadMembers()
@@ -109,13 +147,26 @@ export default function MembersPage() {
   }
 
   const handleDelete = async (member: Member) => {
-    if (!confirm(`Are you sure you want to delete "${member.name}"?`)) return
+    const confirmed = await confirm({
+      title: 'Delete Member',
+      message: `Are you sure you want to delete "${member.name}"? This action cannot be undone.`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    })
+    
+    if (!confirmed) return
 
     try {
-      await libraryClient.deleteMember(member.id)
+      const response = await libraryClient.deleteMember(member.id)
+      if (response.deactivated) {
+        toast.success(`Member "${member.name}" deactivated (has borrow history)`)
+      } else {
+        toast.success(`Member "${member.name}" deleted successfully`)
+      }
       loadMembers()
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to delete member')
+      toast.error(err instanceof Error ? err.message : 'Failed to delete member')
     }
   }
 
@@ -217,47 +268,53 @@ export default function MembersPage() {
             </div>
           )}
           
-          <div>
-            <label className="label">Name *</label>
-            <input
+          <FormField label="Name" required error={fieldErrors.name}>
+            <Input
               type="text"
-              required
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="input"
+              onChange={(e) => {
+                setFormData({ ...formData, name: e.target.value })
+                if (fieldErrors.name) setFieldErrors({ ...fieldErrors, name: null })
+              }}
+              error={fieldErrors.name}
+              placeholder="Enter full name"
             />
-          </div>
+          </FormField>
           
-          <div>
-            <label className="label">Email *</label>
-            <input
+          <FormField label="Email" required error={fieldErrors.email}>
+            <Input
               type="email"
-              required
               value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="input"
+              onChange={(e) => {
+                setFormData({ ...formData, email: e.target.value })
+                if (fieldErrors.email) setFieldErrors({ ...fieldErrors, email: null })
+              }}
+              error={fieldErrors.email}
+              placeholder="Enter email address"
             />
-          </div>
+          </FormField>
           
-          <div>
-            <label className="label">Phone</label>
-            <input
+          <FormField label="Phone" error={fieldErrors.phone}>
+            <Input
               type="tel"
               value={formData.phone || ''}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              className="input"
+              onChange={(e) => {
+                setFormData({ ...formData, phone: e.target.value })
+                if (fieldErrors.phone) setFieldErrors({ ...fieldErrors, phone: null })
+              }}
+              error={fieldErrors.phone}
+              placeholder="Enter phone number"
             />
-          </div>
+          </FormField>
           
-          <div>
-            <label className="label">Address</label>
-            <textarea
+          <FormField label="Address">
+            <Textarea
               value={formData.address || ''}
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              className="input"
               rows={2}
+              placeholder="Enter address"
             />
-          </div>
+          </FormField>
           
           {editingMember && (
             <div className="flex items-center">

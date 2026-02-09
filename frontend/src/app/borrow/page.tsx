@@ -1,14 +1,20 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ArrowPathIcon, CheckCircleIcon } from '@heroicons/react/24/outline'
+import { ArrowPathIcon, CheckCircleIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import { libraryClient } from '@/lib/grpc-client'
 import { Book, Member, BorrowRecord } from '@/lib/types'
 import { Table } from '@/components/Table'
 import { Pagination } from '@/components/Pagination'
 import { Modal } from '@/components/Modal'
+import { useToast } from '@/components/Toast'
+import { useConfirm } from '@/components/ConfirmDialog'
+import { FormField, Select } from '@/components/FormField'
+import { ValidationErrors, hasErrors } from '@/lib/validation'
 
 export default function BorrowPage() {
+  const toast = useToast()
+  const { confirm } = useConfirm()
   const [records, setRecords] = useState<BorrowRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -16,6 +22,8 @@ export default function BorrowPage() {
   const [pageSize] = useState(10)
   const [totalCount, setTotalCount] = useState(0)
   const [statusFilter, setStatusFilter] = useState<string>('BORROWED')
+  const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
   
   // Borrow modal state
   const [isBorrowModalOpen, setIsBorrowModalOpen] = useState(false)
@@ -25,10 +33,11 @@ export default function BorrowPage() {
   const [selectedMemberId, setSelectedMemberId] = useState<number | ''>('')
   const [borrowLoading, setBorrowLoading] = useState(false)
   const [borrowError, setBorrowError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<ValidationErrors>({})
 
   useEffect(() => {
     loadRecords()
-  }, [page, statusFilter])
+  }, [page, statusFilter, search])
 
   const loadRecords = async () => {
     setLoading(true)
@@ -37,7 +46,8 @@ export default function BorrowPage() {
       const response = await libraryClient.listBorrowRecords({ 
         page, 
         pageSize, 
-        status: statusFilter || undefined 
+        status: statusFilter || undefined,
+        search: search || undefined,
       })
       setRecords(response.records)
       setTotalCount(response.totalCount)
@@ -47,6 +57,12 @@ export default function BorrowPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    setSearch(searchInput)
+    setPage(1)
   }
 
   const loadBooksAndMembers = async () => {
@@ -66,22 +82,37 @@ export default function BorrowPage() {
     setSelectedBookId('')
     setSelectedMemberId('')
     setBorrowError(null)
+    setFieldErrors({})
     setIsBorrowModalOpen(true)
     loadBooksAndMembers()
   }
 
+  const validateBorrowForm = (): boolean => {
+    const errors: ValidationErrors = {
+      memberId: !selectedMemberId ? 'Please select a member' : null,
+      bookId: !selectedBookId ? 'Please select a book' : null,
+    }
+    
+    setFieldErrors(errors)
+    return !hasErrors(errors)
+  }
+
   const handleBorrow = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedBookId || !selectedMemberId) return
+    setBorrowError(null)
+    
+    if (!validateBorrowForm()) {
+      return
+    }
 
     setBorrowLoading(true)
-    setBorrowError(null)
 
     try {
       await libraryClient.borrowBook({
         bookId: selectedBookId as number,
         memberId: selectedMemberId as number,
       })
+      toast.success('Book borrowed successfully')
       setIsBorrowModalOpen(false)
       loadRecords()
     } catch (err) {
@@ -92,13 +123,23 @@ export default function BorrowPage() {
   }
 
   const handleReturn = async (record: BorrowRecord) => {
-    if (!confirm('Are you sure you want to return this book?')) return
+    const bookTitle = record.book?.title || 'this book'
+    const confirmed = await confirm({
+      title: 'Return Book',
+      message: `Are you sure you want to return "${bookTitle}"?`,
+      confirmText: 'Return',
+      cancelText: 'Cancel',
+      variant: 'info',
+    })
+    
+    if (!confirmed) return
 
     try {
       await libraryClient.returnBook({ borrowId: record.id })
+      toast.success('Book returned successfully')
       loadRecords()
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to return book')
+      toast.error(err instanceof Error ? err.message : 'Failed to return book')
     }
   }
 
@@ -158,8 +199,32 @@ export default function BorrowPage() {
         </button>
       </div>
 
-      {/* Status Filter */}
-      <div className="mb-6">
+      {/* Search and Status Filter */}
+      <div className="mb-6 flex flex-col sm:flex-row gap-4">
+        {/* Search */}
+        <form onSubmit={handleSearch} className="flex-1">
+          <div className="relative">
+            <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by book title, author, member name or email..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={() => { setSearchInput(''); setSearch(''); setPage(1) }}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                &times;
+              </button>
+            )}
+          </div>
+        </form>
+
+        {/* Status Filter */}
         <div className="flex space-x-2">
           {['BORROWED', 'RETURNED', ''].map((status) => (
             <button
@@ -223,13 +288,14 @@ export default function BorrowPage() {
             </div>
           )}
           
-          <div>
-            <label className="label">Select Member *</label>
-            <select
-              required
+          <FormField label="Select Member" required error={fieldErrors.memberId}>
+            <Select
               value={selectedMemberId}
-              onChange={(e) => setSelectedMemberId(e.target.value ? parseInt(e.target.value) : '')}
-              className="input"
+              onChange={(e) => {
+                setSelectedMemberId(e.target.value ? parseInt(e.target.value) : '')
+                if (fieldErrors.memberId) setFieldErrors({ ...fieldErrors, memberId: null })
+              }}
+              error={fieldErrors.memberId}
             >
               <option value="">Choose a member...</option>
               {members.map((member) => (
@@ -237,19 +303,20 @@ export default function BorrowPage() {
                   {member.name} ({member.email})
                 </option>
               ))}
-            </select>
-            {members.length === 0 && (
+            </Select>
+            {members.length === 0 && !fieldErrors.memberId && (
               <p className="mt-1 text-sm text-gray-500">No active members available</p>
             )}
-          </div>
+          </FormField>
           
-          <div>
-            <label className="label">Select Book *</label>
-            <select
-              required
+          <FormField label="Select Book" required error={fieldErrors.bookId}>
+            <Select
               value={selectedBookId}
-              onChange={(e) => setSelectedBookId(e.target.value ? parseInt(e.target.value) : '')}
-              className="input"
+              onChange={(e) => {
+                setSelectedBookId(e.target.value ? parseInt(e.target.value) : '')
+                if (fieldErrors.bookId) setFieldErrors({ ...fieldErrors, bookId: null })
+              }}
+              error={fieldErrors.bookId}
             >
               <option value="">Choose a book...</option>
               {books.map((book) => (
@@ -257,11 +324,11 @@ export default function BorrowPage() {
                   {book.title} by {book.author} ({book.availableCopies} available)
                 </option>
               ))}
-            </select>
-            {books.length === 0 && (
+            </Select>
+            {books.length === 0 && !fieldErrors.bookId && (
               <p className="mt-1 text-sm text-gray-500">No books available for borrowing</p>
             )}
-          </div>
+          </FormField>
           
           <div className="flex justify-end space-x-3 pt-4">
             <button
@@ -273,7 +340,7 @@ export default function BorrowPage() {
             </button>
             <button
               type="submit"
-              disabled={borrowLoading || !selectedBookId || !selectedMemberId}
+              disabled={borrowLoading}
               className="btn btn-primary"
             >
               {borrowLoading ? 'Processing...' : 'Borrow Book'}

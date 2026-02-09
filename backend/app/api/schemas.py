@@ -15,7 +15,7 @@ class BookBase(BaseModel):
     isbn: Optional[str] = Field(None, max_length=20)
     published_year: Optional[int] = Field(None, alias="publishedYear")
     genre: Optional[str] = Field(None, max_length=100)
-    total_copies: int = Field(1, ge=1, alias="totalCopies")
+    total_copies: int = Field(1, ge=1, le=10000, alias="totalCopies")
 
     class Config:
         populate_by_name = True
@@ -31,7 +31,7 @@ class BookUpdate(BaseModel):
     isbn: Optional[str] = Field(None, max_length=20)
     published_year: Optional[int] = Field(None, alias="publishedYear")
     genre: Optional[str] = Field(None, max_length=100)
-    total_copies: Optional[int] = Field(None, ge=1, alias="totalCopies")
+    total_copies: Optional[int] = Field(None, ge=1, le=10000, alias="totalCopies")
 
     class Config:
         populate_by_name = True
